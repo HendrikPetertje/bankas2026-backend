@@ -80,6 +80,53 @@ defmodule Bankas2026Backend.AccountsTest do
       assert {:error, :invalid_credentials} = Accounts.authenticate_user("gardenr", "999999")
       assert {:error, :invalid_credentials} = Accounts.authenticate_user("missing", "123456")
     end
+
+    test "increments failed attempts and resets them on success" do
+      user = user_fixture(%{username: "gardenr"})
+
+      assert {:error, :invalid_credentials} = Accounts.authenticate_user("gardenr", "999999")
+
+      failed_user = Repo.get!(Bankas2026Backend.Accounts.User, user.id)
+      assert failed_user.failed_login_attempts == 1
+      assert %DateTime{} = failed_user.last_failed_login_attempt_at
+
+      assert {:ok, authenticated_user} = Accounts.authenticate_user("gardenr", "123456")
+      assert authenticated_user.failed_login_attempts == 0
+      assert is_nil(authenticated_user.last_failed_login_attempt_at)
+    end
+
+    test "rejects login during the active lockout window" do
+      user = user_fixture(%{username: "gardenr"})
+
+      locked_user =
+        user
+        |> Ecto.Changeset.change(
+          failed_login_attempts: 5,
+          last_failed_login_attempt_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      assert {:error, :too_many_login_attempts} = Accounts.authenticate_user("gardenr", "123456")
+
+      persisted_user = Repo.get!(Bankas2026Backend.Accounts.User, locked_user.id)
+      assert persisted_user.failed_login_attempts == 5
+    end
+
+    test "allows login again after the lockout window expires" do
+      user = user_fixture(%{username: "gardenr"})
+
+      user
+      |> Ecto.Changeset.change(
+        failed_login_attempts: 5,
+        last_failed_login_attempt_at:
+          DateTime.utc_now() |> DateTime.add(-601, :second) |> DateTime.truncate(:second)
+      )
+      |> Repo.update!()
+
+      assert {:ok, authenticated_user} = Accounts.authenticate_user("gardenr", "123456")
+      assert authenticated_user.failed_login_attempts == 0
+      assert is_nil(authenticated_user.last_failed_login_attempt_at)
+    end
   end
 
   describe "get_user_from_jwt/1" do

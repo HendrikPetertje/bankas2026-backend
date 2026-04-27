@@ -51,5 +51,6 @@ defmodule Bankas2026BackendWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  plug Bankas2026BackendWeb.Plugs.ApiCors
   plug Bankas2026BackendWeb.Router
 end

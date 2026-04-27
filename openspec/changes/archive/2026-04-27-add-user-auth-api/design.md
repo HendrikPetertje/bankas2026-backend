@@ -1,6 +1,6 @@
 ## Context
 
-The shared `Accounts` domain and JWT support now exist, but there is still no public HTTP surface for clients to create accounts or log in. The farming SPA needs those endpoints first so it can obtain tokens and bootstrap the initial game state. The outline also requires browser access from the production SPA origin and the local React development server.
+The shared `Accounts` domain, JWT support, and Farms context now exist, but there is still no public HTTP surface for clients to create accounts or log in. The farming SPA needs those endpoints first so it can obtain tokens and bootstrap the initial game state. The outline also requires browser access from the production SPA origin and the local React development server.
 
 This change crosses several application layers:
 
@@ -42,11 +42,12 @@ Alternatives considered:
 
 ### Keep sign-up orchestration in application code, not in callbacks
 
-Sign-up will span multiple domains: create the user, create the garden, create 9 plots, create a token, and render the response. That orchestration should live in an application-facing function or controller-facing service flow backed by a transaction, rather than hidden inside schema callbacks.
+Sign-up will span multiple domains: create the user, call the Farms context to provision the initial farm, create a token, and render the response. That orchestration should live in an application-facing function or controller-facing service flow backed by a transaction, rather than hidden inside schema callbacks.
 
 Alternatives considered:
 
 - Use Ecto callbacks or side effects in `Accounts.create_user/1`: rejected because farm provisioning belongs to a higher-level flow, not the account schema.
+- Reimplement garden and plot creation inside the auth controller: rejected because the Farms context already owns that behavior.
 
 ### Implement login lockout inside the shared account domain
 
@@ -85,7 +86,7 @@ Alternatives considered:
 
 1. Extend the shared account logic to support failed-attempt tracking and lockout decisions.
 2. Add the users API routes, controller, and JSON rendering.
-3. Add the sign-up transaction that provisions the user, garden, and 9 plots.
+3. Add the sign-up transaction that creates the user and calls the Farms context to provision the initial farm.
 4. Add CORS handling for the approved SPA origins and preflight requests.
 5. Add tests for sign-up, login, lockout behavior, and CORS responses.
 

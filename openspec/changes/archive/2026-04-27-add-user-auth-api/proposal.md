@@ -5,7 +5,7 @@ The project now has a shared `Accounts` domain and JWT support, but clients stil
 ## What Changes
 
 - Add public JSON endpoints for `POST /api/users/sign-up` and `POST /api/users/login`.
-- Create a user on sign-up, create the associated farm garden and its 9 empty plots, and return `{token, garden}`.
+- Create a user on sign-up, call the Farms context to create the associated farm, and return `{token, garden}`.
 - Authenticate existing users on login and return a fresh `{token, garden}` response.
 - Enforce failed-login lockout behavior at the API boundary using the existing account tracking fields.
 - Add CORS handling for `https://lager.bankasviken` and `http://localhost:3000`, including preflight `OPTIONS` support.
@@ -24,4 +24,4 @@ The project now has a shared `Accounts` domain and JWT support, but clients stil
 - Affected code: router, controllers, JSON rendering, auth-related plugs, farms integration, and account logic.
 - Affected APIs: introduces `/api/users/sign-up` and `/api/users/login`.
 - Browser access: adds cross-origin support for the approved production and local SPA origins.
-- Systems: sign-up now spans both Accounts and Farms to provision the initial garden state.
+- Systems: sign-up now orchestrates Accounts plus the existing Farms context to provision the initial garden state.

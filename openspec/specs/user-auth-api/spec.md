@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Sign-up creates a shared account and initial farm state
 The system SHALL provide a public `POST /api/users/sign-up` endpoint that creates a new shared account and provisions the initial farming state.
@@ -6,8 +6,8 @@ The system SHALL provide a public `POST /api/users/sign-up` endpoint that create
 #### Scenario: Successful sign-up provisions the user and garden
 - **WHEN** a client sends a valid `POST /api/users/sign-up` request with `username` and `pin`
 - **THEN** the system creates the user account
-- **THEN** the system creates one garden for that user
-- **THEN** the system creates exactly 9 empty plots for that garden
+- **THEN** the system uses the Farms context to create one garden for that user
+- **THEN** the system uses the Farms context to create exactly 9 empty plots for that garden
 - **THEN** the system returns a signed JWT and the created garden payload as JSON
 
 #### Scenario: Sign-up rejects invalid account input

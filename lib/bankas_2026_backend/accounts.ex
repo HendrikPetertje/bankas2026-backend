@@ -9,6 +9,9 @@ defmodule Bankas2026Backend.Accounts do
   alias Bankas2026Backend.Accounts.User
   alias Bankas2026Backend.Repo
 
+  @lockout_attempt_threshold 5
+  @lockout_window_seconds 600
+
   @spec create_user(map()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t()}
   def create_user(attrs) do
     %User{}
@@ -24,18 +27,24 @@ defmodule Bankas2026Backend.Accounts do
   end
 
   @spec authenticate_user(String.t(), String.t()) ::
-          {:ok, User.t()} | {:error, :invalid_credentials}
+          {:ok, User.t()} | {:error, :invalid_credentials | :too_many_login_attempts}
   def authenticate_user(username, pin)
 
   def authenticate_user(username, pin) when is_binary(username) and is_binary(pin) do
     normalized_username = User.normalize_username(username)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     case Repo.one(from user in User, where: user.username == ^normalized_username) do
       %User{} = user ->
-        if Bcrypt.verify_pass(pin, user.pincode_hash) do
-          {:ok, user}
-        else
-          {:error, :invalid_credentials}
+        cond do
+          lockout_active?(user, now) ->
+            {:error, :too_many_login_attempts}
+
+          Bcrypt.verify_pass(pin, user.pincode_hash) ->
+            reset_failed_login_tracking(user)
+
+          true ->
+            record_failed_login_attempt(user, now)
         end
 
       nil ->
@@ -59,6 +68,42 @@ defmodule Bankas2026Backend.Accounts do
   end
 
   def get_user_from_jwt(_), do: {:error, :invalid_token}
+
+  defp lockout_active?(user, now) do
+    user.failed_login_attempts >= @lockout_attempt_threshold and
+      not tracking_expired?(user, now)
+  end
+
+  defp tracking_expired?(%User{last_failed_login_attempt_at: nil}, _now), do: true
+
+  defp tracking_expired?(%User{last_failed_login_attempt_at: last_attempt_at}, now) do
+    DateTime.diff(now, last_attempt_at, :second) >= @lockout_window_seconds
+  end
+
+  defp reset_failed_login_tracking(user) do
+    user
+    |> Ecto.Changeset.change(failed_login_attempts: 0, last_failed_login_attempt_at: nil)
+    |> Repo.update()
+    |> case do
+      {:ok, reset_user} -> {:ok, reset_user}
+      {:error, _changeset} -> {:error, :invalid_credentials}
+    end
+  end
+
+  defp record_failed_login_attempt(user, now) do
+    attempts = if tracking_expired?(user, now), do: 1, else: user.failed_login_attempts + 1
+
+    user
+    |> Ecto.Changeset.change(
+      failed_login_attempts: attempts,
+      last_failed_login_attempt_at: now
+    )
+    |> Repo.update()
+    |> case do
+      {:ok, _user} -> {:error, :invalid_credentials}
+      {:error, _changeset} -> {:error, :invalid_credentials}
+    end
+  end
 
   defp fetch_subject(%{"sub" => user_id}) when is_binary(user_id), do: {:ok, user_id}
   defp fetch_subject(_claims), do: {:error, :invalid_token}
