@@ -1,8 +1,6 @@
-FROM elixir:1.19.5-otp-28 AS builder
+FROM elixir:1.19.5-otp-28-alpine AS builder
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential git curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache build-base git curl
 
 WORKDIR /app
 
@@ -24,11 +22,9 @@ RUN mix compile
 RUN mix assets.deploy
 RUN mix release
 
-FROM debian:bookworm-slim AS runner
+FROM alpine:3.22 AS runner
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libstdc++ openssl ncurses-libs ca-certificates
 
 WORKDIR /app
 
