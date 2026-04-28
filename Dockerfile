@@ -1,4 +1,4 @@
-FROM elixir:1.19.5-otp-28-bookworm AS builder
+FROM elixir:1.19.5-otp-28 AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential git curl && \
