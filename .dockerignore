@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+/postgres
+/_build
+/deps
+/tmp
+/test
+/doc
+/cover
+erl_crash.dump

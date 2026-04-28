@@ -35,3 +35,4 @@ bankas_2026_backend-*.tar
 npm-debug.log
 /assets/node_modules/
 .env
+/postgres

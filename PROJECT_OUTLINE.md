@@ -310,7 +310,7 @@ Response shape:
 
 Returns the current authenticated garden state.
 
-#### `POST /api/farms/plot/:plot_number/clean`
+#### `POST /api/farms/plots/:plot_number/clean`
 
 Behavior:
 
@@ -324,7 +324,7 @@ Notes:
 - there is no separate weed-removal endpoint
 - cleaning does not fix watering
 
-#### `POST /api/farms/plot/:plot_number/seed`
+#### `POST /api/farms/plots/:plot_number/seed`
 
 Request body:
 
@@ -343,7 +343,7 @@ Behavior:
 - initializes `weed_stars` to `5`
 - returns the entire updated garden state
 
-#### `POST /api/farms/plot/:plot_number/water`
+#### `POST /api/farms/plots/:plot_number/water`
 
 Behavior:
 
@@ -351,7 +351,7 @@ Behavior:
 - updates `last_watered_at` to now
 - returns the entire updated garden state
 
-#### `POST /api/farms/plot/:plot_number/harvest`
+#### `POST /api/farms/plots/:plot_number/harvest`
 
 Behavior:
 

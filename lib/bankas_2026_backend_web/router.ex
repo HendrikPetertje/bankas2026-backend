@@ -26,6 +26,12 @@ defmodule Bankas2026BackendWeb.Router do
     options "/*path", UserAuthController, :options
     post "/users/sign-up", UserAuthController, :sign_up
     post "/users/login", UserAuthController, :login
+    get "/farms/plant-info", FarmsController, :plant_info
+    get "/farms/me", FarmsController, :me
+    post "/farms/plots/:plot_number/clean", PlotsController, :clean
+    post "/farms/plots/:plot_number/seed", PlotsController, :seed
+    post "/farms/plots/:plot_number/water", PlotsController, :water
+    post "/farms/plots/:plot_number/harvest", PlotsController, :harvest
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
