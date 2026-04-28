@@ -114,6 +114,24 @@ mix precommit
 
 All examples below assume the server is running at `http://localhost:4000`.
 
+Protected endpoints require a bearer token:
+
+```bash
+-H "Authorization: Bearer $FARM_TOKEN"
+```
+
+The API currently exposes these routes:
+
+- `POST /api/users/sign-up`
+- `POST /api/users/login`
+- `GET /api/farms/plant-info`
+- `GET /api/farms/me`
+- `POST /api/farms/plots/:plot_number/clean`
+- `POST /api/farms/plots/:plot_number/seed`
+- `POST /api/farms/plots/:plot_number/water`
+- `POST /api/farms/plots/:plot_number/harvest`
+- `OPTIONS /api/*path`
+
 ## User Auth
 
 ### `POST /api/users/sign-up`
@@ -215,4 +233,88 @@ Preflight request for browser clients.
 curl -i -X OPTIONS http://localhost:4000/api/farms/me \
   -H "Origin: http://localhost:3000" \
   -H "Access-Control-Request-Method: GET"
+```
+
+## Plot Actions
+
+All plot action endpoints require authentication and return the full updated garden state.
+
+### `POST /api/farms/plots/:plot_number/clean`
+
+Cleans a plot or removes weeds from the selected plot.
+
+```bash
+curl -X POST http://localhost:4000/api/farms/plots/1/clean \
+  -H "Authorization: Bearer $FARM_TOKEN"
+```
+
+### `POST /api/farms/plots/:plot_number/seed`
+
+Seeds a plot with a valid plant kind.
+
+```bash
+curl -X POST http://localhost:4000/api/farms/plots/1/seed \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $FARM_TOKEN" \
+  -d '{
+    "plant_kind": "carrot"
+  }'
+```
+
+### `POST /api/farms/plots/:plot_number/water`
+
+Waters the selected plot.
+
+```bash
+curl -X POST http://localhost:4000/api/farms/plots/1/water \
+  -H "Authorization: Bearer $FARM_TOKEN"
+```
+
+### `POST /api/farms/plots/:plot_number/harvest`
+
+Harvests a ready plot and returns the updated garden.
+
+```bash
+curl -X POST http://localhost:4000/api/farms/plots/1/harvest \
+  -H "Authorization: Bearer $FARM_TOKEN"
+```
+
+### `OPTIONS /api/farms/plots/:plot_number/clean`
+
+Preflight request for browser clients.
+
+```bash
+curl -i -X OPTIONS http://localhost:4000/api/farms/plots/1/clean \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+### `OPTIONS /api/farms/plots/:plot_number/seed`
+
+Preflight request for browser clients.
+
+```bash
+curl -i -X OPTIONS http://localhost:4000/api/farms/plots/1/seed \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+### `OPTIONS /api/farms/plots/:plot_number/water`
+
+Preflight request for browser clients.
+
+```bash
+curl -i -X OPTIONS http://localhost:4000/api/farms/plots/1/water \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+### `OPTIONS /api/farms/plots/:plot_number/harvest`
+
+Preflight request for browser clients.
+
+```bash
+curl -i -X OPTIONS http://localhost:4000/api/farms/plots/1/harvest \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST"
 ```
