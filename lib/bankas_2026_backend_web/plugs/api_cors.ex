@@ -4,7 +4,7 @@ defmodule Bankas2026BackendWeb.Plugs.ApiCors do
   import Plug.Conn
 
   @allowed_origins MapSet.new([
-                     "https://lager.bankasviken",
+                     "https://lager.bankasviken.se",
                      "http://localhost:3000"
                    ])
 

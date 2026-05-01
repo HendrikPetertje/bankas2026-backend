@@ -1,0 +1,485 @@
+openapi: 3.1.0
+info:
+  title: Bankas 2026 Backend API
+  description: |
+    JSON API for the Bankasviken 2026 farming game. Players register an account,
+    receive a garden with 9 plots, and manage crops through cleaning, seeding,
+    watering, and harvesting actions.
+  version: 1.0.0
+
+servers:
+  - url: https://bankas2026-backend.hendrikpeter.net
+    description: Production
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token returned by sign-up or login endpoints.
+
+  schemas:
+    Garden:
+      type: object
+      required: [user_name, produced_g, plots]
+      properties:
+        user_name:
+          type: string
+          example: peterd
+        produced_g:
+          type: integer
+          description: Total grams produced by this garden.
+          example: 4200
+        plots:
+          type: array
+          minItems: 9
+          maxItems: 9
+          description: A garden always has exactly 9 plots (numbered 1-9).
+          items:
+            $ref: "#/components/schemas/Plot"
+
+    Plot:
+      type: object
+      required: [number, state, plant_kind, planted_at, last_watered_at, last_weeds_removed_at, water_stars, weed_stars]
+      properties:
+        number:
+          type: integer
+          minimum: 1
+          maximum: 9
+          example: 1
+        state:
+          type: string
+          enum: [BARREN, CLEANED, SEEDED]
+          example: SEEDED
+        plant_kind:
+          type: string
+          nullable: true
+          enum: [LETTUCE, TOMATO, CARROT, PUMPKIN, null]
+          description: Set when state is SEEDED, null otherwise.
+          example: TOMATO
+        planted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC timestamp when the plot was seeded. Null if not seeded.
+        last_watered_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC timestamp of the last watering action.
+        last_weeds_removed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC timestamp of the last cleaning action.
+        water_stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: Water quality rating (1-5). Only present when seeded.
+        weed_stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+          description: Weed cleanliness rating (1-5). Only present when seeded.
+
+    Plant:
+      type: object
+      required: [kind, growing_time_s, weight_g]
+      properties:
+        kind:
+          type: string
+          enum: [LETTUCE, TOMATO, CARROT, PUMPKIN]
+          example: TOMATO
+        growing_time_s:
+          type: integer
+          description: Seconds required for the plant to be ready for harvest.
+          example: 14400
+        weight_g:
+          type: object
+          description: Harvest yield in grams keyed by star rating (1-5).
+          additionalProperties:
+            type: integer
+          example:
+            "1": 800
+            "2": 1000
+            "3": 3000
+            "4": 4500
+            "5": 5000
+
+    AuthResponse:
+      type: object
+      required: [token, garden]
+      properties:
+        token:
+          type: string
+          description: JWT bearer token for authenticated requests.
+        garden:
+          $ref: "#/components/schemas/Garden"
+
+    GardenResponse:
+      type: object
+      required: [garden]
+      properties:
+        garden:
+          $ref: "#/components/schemas/Garden"
+
+    PlantInfoResponse:
+      type: object
+      required: [plants]
+      properties:
+        plants:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plant"
+
+    ErrorResponse:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: object
+          properties:
+            detail:
+              type: string
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+
+    AuthErrorResponse:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          example: invalid credentials
+
+paths:
+  /api/users/sign-up:
+    post:
+      summary: Register a new user
+      description: |
+        Creates a new user account, provisions a garden with 9 barren plots,
+        and returns a JWT token.
+      operationId: signUp
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, pin]
+              properties:
+                username:
+                  type: string
+                  minLength: 6
+                  description: Unique username (min 6 characters, will be lowercased and trimmed).
+                  example: peterd
+                pin:
+                  type: string
+                  pattern: "^\\d{6}$"
+                  description: 6-digit PIN code.
+                  example: "123456"
+      responses:
+        "201":
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "422":
+          description: Validation error (e.g. username taken, invalid PIN format).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/users/login:
+    post:
+      summary: Log in
+      description: |
+        Authenticates a user by username and PIN. Returns a fresh JWT token
+        and the current garden state. Locks out after 5 failed attempts
+        within a 10-minute window.
+      operationId: login
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, pin]
+              properties:
+                username:
+                  type: string
+                  example: peterd
+                pin:
+                  type: string
+                  example: "123456"
+      responses:
+        "200":
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials or too many login attempts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "422":
+          description: Invalid login parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/farms/plant-info:
+    get:
+      summary: Get plant catalog
+      description: Returns all available plant types with growing times and harvest yields.
+      operationId: getPlantInfo
+      tags: [Farms]
+      responses:
+        "200":
+          description: Plant catalog.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlantInfoResponse"
+              example:
+                plants:
+                  - kind: LETTUCE
+                    growing_time_s: 3600
+                    weight_g:
+                      "1": 200
+                      "2": 400
+                      "3": 600
+                      "4": 800
+                      "5": 1000
+                  - kind: TOMATO
+                    growing_time_s: 14400
+                    weight_g:
+                      "1": 800
+                      "2": 1000
+                      "3": 3000
+                      "4": 4500
+                      "5": 5000
+                  - kind: CARROT
+                    growing_time_s: 7200
+                    weight_g:
+                      "1": 500
+                      "2": 900
+                      "3": 1500
+                      "4": 2000
+                      "5": 3000
+                  - kind: PUMPKIN
+                    growing_time_s: 21600
+                    weight_g:
+                      "1": 900
+                      "2": 1000
+                      "3": 4000
+                      "4": 6000
+                      "5": 7000
+
+  /api/farms/me:
+    get:
+      summary: Get current user's garden
+      description: Returns the authenticated user's garden with all plot states.
+      operationId: getMyFarm
+      tags: [Farms]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current garden state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GardenResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/farms/plots/{plot_number}/clean:
+    post:
+      summary: Clean a plot
+      description: |
+        Removes weeds from a plot. On a BARREN plot this transitions it to CLEANED.
+        On a SEEDED plot this refreshes the weed_stars timer.
+      operationId: cleanPlot
+      tags: [Plots]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: plot_number
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+      responses:
+        "200":
+          description: Plot cleaned. Returns updated garden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GardenResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Plot state does not allow cleaning (e.g. already CLEANED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/farms/plots/{plot_number}/seed:
+    post:
+      summary: Seed a plot
+      description: |
+        Plants a crop on a CLEANED plot. The plot must have been watered within
+        the last 30 minutes. Transitions the plot to SEEDED state with 5/5 stars.
+      operationId: seedPlot
+      tags: [Plots]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: plot_number
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plant_kind]
+              properties:
+                plant_kind:
+                  type: string
+                  enum: [LETTUCE, TOMATO, CARROT, PUMPKIN]
+                  description: The type of plant to seed.
+                  example: TOMATO
+      responses:
+        "200":
+          description: Plot seeded. Returns updated garden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GardenResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Plot is not in CLEANED state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid plant kind or plot not watered recently.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/farms/plots/{plot_number}/water:
+    post:
+      summary: Water a plot
+      description: Updates the last_watered_at timestamp on a plot.
+      operationId: waterPlot
+      tags: [Plots]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: plot_number
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+      responses:
+        "200":
+          description: Plot watered. Returns updated garden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GardenResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/farms/plots/{plot_number}/harvest:
+    post:
+      summary: Harvest a plot
+      description: |
+        Harvests a SEEDED plot whose growing time has elapsed. The yield in grams
+        is determined by the minimum of water_stars and weed_stars at harvest time.
+        The plot returns to BARREN state and produced_g is incremented on the garden.
+      operationId: harvestPlot
+      tags: [Plots]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: plot_number
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+      responses:
+        "200":
+          description: Plot harvested. Returns updated garden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GardenResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Plot is not in SEEDED state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Plant is not ready for harvest yet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
