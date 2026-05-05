@@ -44,6 +44,7 @@ defmodule Bankas2026Backend.Farms do
     with_plot_action(user_id, plot_number, true, fn plot, now ->
       case plot.state do
         "BARREN" -> {:ok, %{state: "CLEANED", last_weeds_removed_at: now}}
+        "CLEANED" -> {:ok, %{last_weeds_removed_at: now}}
         "SEEDED" -> {:ok, %{last_weeds_removed_at: now}}
         _ -> {:error, :invalid_plot_state}
       end
@@ -156,6 +157,7 @@ defmodule Bankas2026Backend.Farms do
         garden_id: garden.id,
         number: number,
         state: "BARREN",
+        last_weeds_removed_at: now,
         inserted_at: now,
         updated_at: now
       }

@@ -17,7 +17,11 @@ defmodule Bankas2026Backend.FarmsTest do
       assert farm.garden.produced_g == 0
       assert length(farm.garden.plots) == 9
       assert Enum.map(farm.garden.plots, & &1.number) == Enum.to_list(1..9)
-      assert Enum.all?(farm.garden.plots, &(&1.state == "BARREN" and is_nil(&1.last_watered_at)))
+
+      assert Enum.all?(farm.garden.plots, fn plot ->
+               plot.state == "BARREN" and is_nil(plot.last_watered_at) and
+                 match?(%DateTime{}, plot.last_weeds_removed_at)
+             end)
 
       assert {:ok, loaded_farm} = Farms.get_farm_by_user_id(user.id)
       assert loaded_farm == farm
@@ -45,6 +49,28 @@ defmodule Bankas2026Backend.FarmsTest do
 
       assert plot.state == "SEEDED"
       assert %DateTime{} = plot.last_weeds_removed_at
+    end
+
+    test "cleaning a cleaned plot removes regrown weeds without changing state" do
+      %{user: user} = farm_fixture()
+
+      assert {:ok, _farm} = Farms.clean_plot(user.id, 1)
+
+      first_cleaned_at =
+        DateTime.utc_now() |> DateTime.add(-7_200, :second) |> DateTime.truncate(:second)
+
+      garden = Repo.get_by!(Garden, user_id: user.id)
+      plot = Repo.get_by!(GardenPlot, garden_id: garden.id, number: 1)
+
+      plot
+      |> GardenPlot.action_changeset(%{last_weeds_removed_at: first_cleaned_at})
+      |> Repo.update!()
+
+      assert {:ok, farm} = Farms.clean_plot(user.id, 1)
+      plot = Enum.at(farm.garden.plots, 0)
+
+      assert plot.state == "CLEANED"
+      assert DateTime.compare(plot.last_weeds_removed_at, first_cleaned_at) == :gt
     end
 
     test "seeding requires a cleaned and recently watered plot" do
@@ -102,6 +128,8 @@ defmodule Bankas2026Backend.FarmsTest do
       assert plot.state == "BARREN"
       assert is_nil(plot.plant_kind)
       assert is_nil(plot.planted_at)
+      assert %DateTime{} = plot.last_watered_at
+      assert %DateTime{} = plot.last_weeds_removed_at
       assert is_nil(plot.water_stars)
       assert is_nil(plot.weed_stars)
     end
@@ -110,7 +138,7 @@ defmodule Bankas2026Backend.FarmsTest do
       %{user: user} = farm_fixture()
 
       assert {:ok, _farm} = Farms.clean_plot(user.id, 1)
-      assert {:error, :invalid_plot_state} = Farms.clean_plot(user.id, 1)
+      assert {:ok, _farm} = Farms.clean_plot(user.id, 1)
       assert {:error, :invalid_plant_kind} = Farms.seed_plot(user.id, 1, "POTATO")
     end
 
