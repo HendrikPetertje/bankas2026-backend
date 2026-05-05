@@ -44,7 +44,7 @@ defmodule Bankas2026Backend.Farms.GardenPlot do
       :weed_stars,
       :last_penalty_at
     ])
-    |> validate_required([:garden_id, :number, :state])
+    |> validate_required([:garden_id, :number, :state, :last_weeds_removed_at])
     |> validate_inclusion(:state, @states)
     |> validate_number(:number, greater_than_or_equal_to: 1, less_than_or_equal_to: 9)
     |> validate_inclusion(:plant_kind, PlantCatalog.kinds())
@@ -67,7 +67,7 @@ defmodule Bankas2026Backend.Farms.GardenPlot do
       :weed_stars,
       :last_penalty_at
     ])
-    |> validate_required([:state])
+    |> validate_required([:state, :last_weeds_removed_at])
     |> validate_inclusion(:state, @states)
     |> validate_inclusion(:plant_kind, PlantCatalog.kinds())
     |> validate_number(:water_stars, greater_than_or_equal_to: 1, less_than_or_equal_to: 5)
